@@ -1,5 +1,5 @@
 {
-  "name": "lari-mystic-bot",
+  "name": "joaodaniel-mystic-bot",
   "version": "1.0.0",
   "description": "Bot WhatsApp com sistema de Cartas Místicas, moderação, jogos, RPG e segurança avançada.",
   "main": "src/index.js",
