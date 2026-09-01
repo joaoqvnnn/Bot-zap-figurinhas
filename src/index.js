@@ -10,7 +10,9 @@ const {
   DisconnectReason,
   fetchLatestBaileysVersion,
 } = require("@whiskeysockets/baileys");
-const qrcode = require("qrcode-terminal");
+const qrcodeTerminal = require("qrcode-terminal");
+const QRCode = require("qrcode");
+const http = require("http");
 const pino = require("pino");
 const mongoose = require("mongoose");
 
@@ -19,6 +21,7 @@ const logger = require("./utils/logger");
 const { handleMessage } = require("./handlers/messageHandler");
 
 global.sock = null;
+global.qrImageUrl = null;
 
 async function conectarMongoDB() {
   if (!config.MONGODB_URI) {
@@ -54,10 +57,22 @@ async function iniciarBot() {
 
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
+
     if (qr) {
-      qrcode.generate(qr, { small: true });
-      logger.info("QR Code gerado. Escaneie com o WhatsApp.");
+      // QR Code no terminal (pode ser útil)
+      qrcodeTerminal.generate(qr, { small: true });
+
+      // Gera imagem do QR Code para exibir em página web
+      QRCode.toDataURL(qr, { width: 300, margin: 2 }, (err, url) => {
+        if (err) {
+          logger.error("Erro ao gerar QR em imagem:", err.message);
+          return;
+        }
+        global.qrImageUrl = url;
+        logger.info("QR Code disponível em /qr");
+      });
     }
+
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
       const deveReconectar =
@@ -72,6 +87,7 @@ async function iniciarBot() {
       }
     } else if (connection === "open") {
       logger.info("Bot conectado ao WhatsApp!");
+      global.qrImageUrl = null;
     }
   });
 
@@ -89,6 +105,69 @@ async function iniciarBot() {
   });
 }
 
+// ==============================================
+// SERVIDOR WEB PARA EXIBIR QR CODE
+// ==============================================
+const server = http.createServer((req, res) => {
+  if (req.url === "/qr" && global.qrImageUrl) {
+    res.writeHead(200, { "Content-Type": "text/html" });
+    res.end(`
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>QR Code - Lari Mystic Bot</title>
+        <style>
+          body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #f5f5f5;
+            font-family: Arial, sans-serif;
+          }
+          .container {
+            text-align: center;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+          }
+          img {
+            width: 300px;
+            height: 300px;
+            image-rendering: crisp-edges;
+          }
+          h2 {
+            margin-bottom: 20px;
+            color: #333;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2>📱 Escaneie o QR Code</h2>
+          <img src="${global.qrImageUrl}" alt="QR Code" />
+          <p>Abra o WhatsApp → Aparelhos conectados → Conectar aparelho</p>
+        </div>
+      </body>
+      </html>
+    `);
+  } else {
+    res.writeHead(200, { "Content-Type": "text/plain" });
+    res.end("Acesse /qr para ver o QR Code");
+  }
+});
+
+server.listen(3000, () => {
+  logger.info("Servidor web rodando na porta 3000");
+});
+
+// ==============================================
+// INICIAR BOT
+// ==============================================
 iniciarBot().catch((err) => {
   logger.error("Erro fatal:", err.message);
   process.exit(1);
