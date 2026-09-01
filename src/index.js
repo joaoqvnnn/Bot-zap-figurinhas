@@ -1,5 +1,5 @@
 // ==============================================
-// LARI MYSTIC BOT - ARQUIVO PRINCIPAL DE INICIALIZAÇÃO
+// LARI MYSTIC BOT - ARQUIVO PRINCIPAL ATUALIZADO
 // ==============================================
 
 require("dotenv").config();
@@ -16,13 +16,13 @@ const mongoose = require("mongoose");
 
 const config = require("./config");
 const logger = require("./utils/logger");
+const { handleMessage } = require("./handlers/messageHandler");
 
-// Instância global do socket (será usada pelos handlers)
 global.sock = null;
 
 async function conectarMongoDB() {
   if (!config.MONGODB_URI) {
-    logger.warn("MONGODB_URI não configurado. O banco de dados não será usado.");
+    logger.warn("MONGODB_URI não configurado. Usando armazenamento em memória.");
     return;
   }
   try {
@@ -52,7 +52,6 @@ async function iniciarBot() {
 
   global.sock = sock;
 
-  // Exibe QR Code no terminal
   sock.ev.on("connection.update", (update) => {
     const { connection, lastDisconnect, qr } = update;
     if (qr) {
@@ -76,17 +75,14 @@ async function iniciarBot() {
     }
   });
 
-  // Salva credenciais automaticamente
   sock.ev.on("creds.update", saveCreds);
 
-  // Delega mensagens para o handler (ainda será implementado)
   sock.ev.on("messages.upsert", async (m) => {
     const message = m.messages[0];
     if (!message.message || m.type !== "notify") return;
 
     try {
-      const handlers = require("./handlers/messageHandler");
-      await handlers.handleMessage(sock, message);
+      await handleMessage(sock, message);
     } catch (err) {
       logger.error("Erro ao processar mensagem:", err.message);
     }
