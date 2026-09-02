@@ -1,5 +1,5 @@
 // ==============================================
-// LARI MYSTIC BOT - HANDLER DE MODERAÇÃO ATUALIZADO
+// LARI MYSTIC BOT - HANDLER DE MODERAÇÃO
 // ==============================================
 
 const logger = require("../utils/logger");
@@ -9,9 +9,6 @@ const { adicionarListaNegra, removerListaNegra, getListaNegra } = require("../se
 const { silenciarUsuario, dessilenciarUsuario, isSilenciado } = require("../services/moderationService");
 const { ativarProtecao, desativarProtecao, getProtecoesAtivas } = require("../services/segurancaService");
 
-/**
- * Processa comandos de moderação.
- */
 async function handleModeracao(sock, message) {
   const texto = message.message.conversation || message.message.extendedTextMessage?.text || "";
   const chatId = message.key.remoteJid;
