@@ -1,5 +1,5 @@
 // ==============================================
-// LARI MYSTIC BOT - ARQUIVO PRINCIPAL COM PAREAMENTO
+// LARI MYSTIC BOT - ARQUIVO PRINCIPAL COM ENQUETES
 // ==============================================
 
 require("dotenv").config();
@@ -104,6 +104,26 @@ async function iniciarBot() {
       await handleMessage(sock, message);
     } catch (err) {
       logger.error("Erro ao processar mensagem:", err.message);
+    }
+  });
+
+  // Listener de enquetes (votos)
+  sock.ev.on("messages.update", async (updates) => {
+    for (const { key, update } of updates) {
+      if (update.pollUpdates) {
+        const voto = update.pollUpdates[0]?.voters?.[0];
+        const opcaoEscolhida = update.pollUpdates[0]?.name;
+
+        if (voto && opcaoEscolhida) {
+          const chatId = key.remoteJid;
+          try {
+            const { processarVoto } = require("./menus/cartaMisteriosa");
+            await processarVoto(sock, chatId, opcaoEscolhida);
+          } catch (err) {
+            logger.error("Erro ao processar voto:", err.message);
+          }
+        }
+      }
     }
   });
 }
