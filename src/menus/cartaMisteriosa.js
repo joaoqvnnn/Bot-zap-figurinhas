@@ -1,137 +1,177 @@
 // ==============================================
-// LARI MYSTIC BOT - CONTROLE DE PERMISSÕES E NÍVEIS
+// LARI MYSTIC BOT - SISTEMA DE CARTAS MÍSTICAS
 // ==============================================
 
-const config = require("../config");
 const logger = require("../utils/logger");
+const { NIVEIS, obterNivelUsuario, validarToken } = require("./permissoes");
 const { extrairNumero } = require("../utils/helpers");
 
-// Possíveis níveis de usuário
-const NIVEIS = {
-  DONO: 100,
-  ADMIN: 80,
-  MODERADOR: 50,
-  MEMBRO: 10,
-  BLOQUEADO: 0,
-};
+global.estadoCartas = new Map();
 
-// Mapa de comandos e permissões mínimas
-// Em breve isso será movido para o banco de dados.
-const PERMISSOES_COMANDOS = {
-  // Comandos acessíveis a todos os membros
-  menu: NIVEIS.MEMBRO,
-  carta: NIVEIS.MEMBRO,
-  ajuda: NIVEIS.MEMBRO,
-  sobre: NIVEIS.MEMBRO,
-  perfil: NIVEIS.MEMBRO,
-  // Diversão e jogos
-  dados: NIVEIS.MEMBRO,
-  "pedra-papel-tesoura": NIVEIS.MEMBRO,
-  "cara-ou-coroa": NIVEIS.MEMBRO,
-  // Comandos de moderador
-  ban: NIVEIS.MODERADOR,
-  mute: NIVEIS.MODERADOR,
-  desmute: NIVEIS.MODERADOR,
-  adv: NIVEIS.MODERADOR,
-  rmadv: NIVEIS.MODERADOR,
-  listmods: NIVEIS.MODERADOR,
-  // Comandos de admin
-  promover: NIVEIS.ADMIN,
-  rebaixar: NIVEIS.ADMIN,
-  addmod: NIVEIS.ADMIN,
-  delmod: NIVEIS.ADMIN,
-  ativar: NIVEIS.ADMIN,
-  desativar: NIVEIS.ADMIN,
-  status: NIVEIS.ADMIN,
-  setname: NIVEIS.ADMIN,
-  setdesc: NIVEIS.ADMIN,
-  linkgp: NIVEIS.ADMIN,
-  // Comandos do dono
-  token: NIVEIS.DONO,
-  "modo-manutencao": NIVEIS.DONO,
-  "zerar-tudo": NIVEIS.DONO,
-  broadcast: NIVEIS.DONO,
-  "ver-logs": NIVEIS.DONO,
-};
+async function processarCarta(sock, chatId, remetente, isGroup) {
+  const nivel = await obterNivelUsuario(sock, chatId, remetente);
+  const numero = extrairNumero(remetente);
 
-/**
- * Obtém o nível de permissão de um usuário em um determinado chat.
- * @param {object} sock - Socket do Baileys
- * @param {string} chatId - ID do chat (grupo ou privado)
- * @param {string} remetente - ID do remetente
- * @returns {number} Nível do usuário
- */
-async function obterNivelUsuario(sock, chatId, remetente) {
-  const numeroDono = limparNumero(config.DONO);
-  const numeroRemetente = limparNumero(extrairNumero(remetente));
-
-  // Dono tem acesso total em qualquer lugar
-  if (numeroDono && numeroRemetente === numeroDono) {
-    return NIVEIS.DONO;
+  const opcoes = [];
+  opcoes.push({ id: "diversao", texto: "🎭 Explorar Diversão" });
+  opcoes.push({ id: "desafios", texto: "⚔️ Buscar Desafios" });
+  if (nivel >= NIVEIS.ADMIN) {
+    opcoes.push({ id: "protecoes", texto: "🛡️ Ativar Proteções" });
   }
-
-  // Se for conversa privada, membro tem permissão de membro
-  if (!chatId.endsWith("@g.us")) {
-    return NIVEIS.MEMBRO;
+  if (nivel >= NIVEIS.DONO) {
+    opcoes.push({ id: "dono", texto: "👑 Falar com o Dono" });
   }
+  opcoes.push({ id: "chave", texto: "🔑 Abrir com Chave" });
 
-  // Verificar se é admin ou moderador no grupo
+  global.estadoCartas.set(numero, {
+    chatId,
+    remetente,
+    nivel,
+    carta: "principal",
+  });
+
+  const texto = "Você encontrou uma porta antiga. O que deseja fazer?";
+
+  await enviarCartaInterativa(sock, chatId, texto, opcoes);
+}
+
+async function processarRespostaCarta(sock, chatId, remetente, texto) {
+  const numero = extrairNumero(remetente);
+  const estado = global.estadoCartas.get(numero);
+  if (!estado) return;
+
+  const resposta = texto.trim().toLowerCase();
+
+  if (estado.carta === "principal") {
+    if (resposta === "diversao" || resposta === "1") {
+      await cartaDiversao(sock, chatId, remetente);
+    } else if (resposta === "desafios" || resposta === "2") {
+      await cartaDesafios(sock, chatId, remetente);
+    } else if (resposta === "protecoes" || resposta === "3") {
+      await cartaProtecoes(sock, chatId, remetente);
+    } else if (resposta === "dono" || resposta === "4") {
+      await cartaDono(sock, chatId, remetente);
+    } else if (resposta === "chave" || resposta === "5") {
+      await cartaChave(sock, chatId, remetente);
+    } else {
+      await sock.sendMessage(chatId, { text: "Opção inválida. Envie 'menu' para reiniciar." });
+    }
+  } else if (estado.carta === "chave") {
+    const tokenValido = validarToken(texto);
+    if (tokenValido) {
+      await sock.sendMessage(chatId, { text: "🔓 Acesso concedido!" });
+      global.estadoCartas.delete(numero);
+      await cartaAdmin(sock, chatId, remetente);
+    } else {
+      await sock.sendMessage(chatId, { text: "⛔ Token incorreto. Acesso negado." });
+      global.estadoCartas.delete(numero);
+    }
+  }
+}
+
+async function enviarCartaInterativa(sock, chatId, texto, opcoes) {
   try {
-    const grupoMetadata = await sock.groupMetadata(chatId);
-    const participantes = grupoMetadata.participants || [];
-
-    const participante = participantes.find(
-      (p) => limparNumero(p.id) === numeroRemetente
-    );
-
-    if (!participante) return NIVEIS.MEMBRO;
-
-    if (participante.admin === "superadmin") {
-      return NIVEIS.ADMIN;
-    }
-    if (participante.admin === "admin") {
-      return NIVEIS.ADMIN;
-    }
+    const buttons = opcoes.map((op, i) => ({
+      buttonId: op.id,
+      buttonText: { displayText: op.texto },
+      type: 1,
+    }));
+    await sock.sendMessage(chatId, {
+      text,
+      buttons,
+      headerType: 1,
+    });
   } catch (err) {
-    logger.warn(`Não foi possível verificar admin do grupo ${chatId}: ${err.message}`);
+    let msg = texto + "\n\n";
+    opcoes.forEach((op, i) => {
+      msg += `${i + 1}. ${op.texto}\n`;
+    });
+    msg += "\nResponda com o número da opção.";
+    await sock.sendMessage(chatId, { text: msg });
   }
-
-  // Aqui podemos verificar no banco se é moderador
-  // Por enquanto retornamos membro
-  return NIVEIS.MEMBRO;
 }
 
-/**
- * Verifica se um usuário pode executar um comando.
- * @param {object} sock - Socket do Baileys
- * @param {string} chatId - ID do chat
- * @param {string} remetente - ID do remetente
- * @param {string} comando - Nome do comando (sem / ou !)
- * @param {boolean} isGroup - Se é mensagem de grupo
- * @returns {boolean} Se tem permissão
- */
-async function verificarPermissao(sock, chatId, remetente, comando, isGroup) {
-  const nivelUsuario = await obterNivelUsuario(sock, chatId, remetente);
-  const nivelNecessario = PERMISSOES_COMANDOS[comando] || NIVEIS.MEMBRO;
-
-  // Bloqueado não tem permissão alguma
-  if (nivelUsuario === NIVEIS.BLOQUEADO) return false;
-
-  return nivelUsuario >= nivelNecessario;
+async function cartaDiversao(sock, chatId, remetente) {
+  const numero = extrairNumero(remetente);
+  global.estadoCartas.set(numero, {
+    chatId,
+    remetente,
+    carta: "diversao",
+  });
+  const opcoes = [
+    { id: "jogos", texto: "🎮 Jogos" },
+    { id: "ia", texto: "🤖 Inteligência Artificial" },
+    { id: "stickers", texto: "🎨 Stickers e Mídia" },
+  ];
+  await enviarCartaInterativa(sock, chatId, "🎭 Área de Diversão\nEscolha uma trilha:", opcoes);
 }
 
-/**
- * Verifica se o token informado é válido para áreas restritas.
- * @param {string} tokenRecebido
- * @returns {boolean}
- */
-function validarToken(tokenRecebido) {
-  return String(tokenRecebido || "").trim() === config.TOKEN_GRUPO;
+async function cartaDesafios(sock, chatId, remetente) {
+  const numero = extrairNumero(remetente);
+  global.estadoCartas.set(numero, {
+    chatId,
+    remetente,
+    carta: "desafios",
+  });
+  const opcoes = [
+    { id: "rpg", texto: "⚔️ Sistema de RPG" },
+    { id: "batalha", texto: "⚔️ Batalha" },
+  ];
+  await enviarCartaInterativa(sock, chatId, "⚔️ Desafios\nPrepare-se:", opcoes);
+}
+
+async function cartaProtecoes(sock, chatId, remetente) {
+  const numero = extrairNumero(remetente);
+  global.estadoCartas.set(numero, {
+    chatId,
+    remetente,
+    carta: "protecoes",
+  });
+  const opcoes = [
+    { id: "anti_link", texto: "🛡️ Anti-Link" },
+    { id: "anti_flood", texto: "🛡️ Anti-Flood" },
+    { id: "lista_negra", texto: "🛡️ Lista Negra" },
+    { id: "modo_fortaleza", texto: "🏰 Modo Fortaleza" },
+  ];
+  await enviarCartaInterativa(sock, chatId, "🛡️ Central de Proteções:", opcoes);
+}
+
+async function cartaDono(sock, chatId, remetente) {
+  const nivel = await obterNivelUsuario(sock, chatId, remetente);
+  if (nivel < NIVEIS.DONO) {
+    await sock.sendMessage(chatId, { text: "⛔ Apenas o Dono pode abrir esta porta." });
+    return;
+  }
+  const numero = extrairNumero(remetente);
+  global.estadoCartas.set(numero, {
+    chatId,
+    remetente,
+    carta: "dono",
+  });
+  const opcoes = [
+    { id: "broadcast", texto: "📢 Broadcast" },
+    { id: "zerar", texto: "🔥 Zerar Tudo" },
+    { id: "token", texto: "🔑 Gerar Token" },
+    { id: "logs", texto: "📋 Ver Logs" },
+  ];
+  await enviarCartaInterativa(sock, chatId, "👑 Salão do Dono:", opcoes);
+}
+
+async function cartaChave(sock, chatId, remetente) {
+  const numero = extrairNumero(remetente);
+  global.estadoCartas.set(numero, {
+    chatId,
+    remetente,
+    carta: "chave",
+  });
+  await sock.sendMessage(chatId, { text: "🔑 Digite o token secreto para abrir:" });
+}
+
+async function cartaAdmin(sock, chatId, remetente) {
+  await sock.sendMessage(chatId, { text: "👑 Menu administrativo em construção..." });
 }
 
 module.exports = {
-  NIVEIS,
-  obterNivelUsuario,
-  verificarPermissao,
-  validarToken,
+  processarCarta,
+  processarRespostaCarta,
 };
