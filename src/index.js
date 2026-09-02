@@ -1,5 +1,5 @@
 // ==============================================
-// LARI MYSTIC BOT - COM PAREAMENTO CORRIGIDO
+// LARI MYSTIC BOT - ARQUIVO PRINCIPAL COM PAREAMENTO
 // ==============================================
 
 require("dotenv").config();
@@ -16,6 +16,9 @@ const mongoose = require("mongoose");
 const config = require("./config");
 const logger = require("./utils/logger");
 const { handleMessage } = require("./handlers/messageHandler");
+
+// Importa funções globais
+require("./utils/global");
 
 global.sock = null;
 
@@ -52,7 +55,7 @@ async function iniciarBot() {
 
   global.sock = sock;
 
-  // Gera código de pareamento SE não estiver registrado
+  // Se ainda não tiver sessão, pede código de pareamento
   if (!sock.authState.creds.registered) {
     const numero = config.DONO;
     if (!numero) {
@@ -60,7 +63,6 @@ async function iniciarBot() {
       process.exit(1);
     }
 
-    // Aguarda um pouco antes de pedir o código
     setTimeout(async () => {
       try {
         const codigo = await sock.requestPairingCode(numero);
@@ -68,18 +70,12 @@ async function iniciarBot() {
         logger.info("Digite esse código no WhatsApp em: Aparelhos conectados → Conectar aparelho");
       } catch (err) {
         logger.error("Erro ao gerar código de pareamento:", err.message);
-        logger.info("Tentando QR Code como alternativa...");
       }
     }, 3000);
   }
 
   sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      // Caso o código não funcione, mostra QR pequeno
-      logger.info("QR Code disponível (alternativa).");
-    }
+    const { connection, lastDisconnect } = update;
 
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
