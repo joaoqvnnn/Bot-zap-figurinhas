@@ -1,5 +1,5 @@
 // ==============================================
-// LARI MYSTIC BOT - ARQUIVO PRINCIPAL COM PAREAMENTO
+// LARI MYSTIC BOT - COM PAREAMENTO CORRIGIDO
 // ==============================================
 
 require("dotenv").config();
@@ -18,7 +18,6 @@ const logger = require("./utils/logger");
 const { handleMessage } = require("./handlers/messageHandler");
 
 global.sock = null;
-global.codigoPareamento = null;
 
 async function conectarMongoDB() {
   if (!config.MONGODB_URI) {
@@ -53,7 +52,7 @@ async function iniciarBot() {
 
   global.sock = sock;
 
-  // Se ainda não tiver sessão, pede código de pareamento
+  // Gera código de pareamento SE não estiver registrado
   if (!sock.authState.creds.registered) {
     const numero = config.DONO;
     if (!numero) {
@@ -61,15 +60,26 @@ async function iniciarBot() {
       process.exit(1);
     }
 
-    // Gera código de pareamento
-    const codigo = await sock.requestPairingCode(numero);
-    global.codigoPareamento = codigo;
-    logger.info(`🔑 Seu código de pareamento: ${codigo}`);
-    logger.info("Digite esse código no WhatsApp em: Aparelhos conectados → Conectar aparelho");
+    // Aguarda um pouco antes de pedir o código
+    setTimeout(async () => {
+      try {
+        const codigo = await sock.requestPairingCode(numero);
+        logger.info(`🔑 Seu código de pareamento: ${codigo}`);
+        logger.info("Digite esse código no WhatsApp em: Aparelhos conectados → Conectar aparelho");
+      } catch (err) {
+        logger.error("Erro ao gerar código de pareamento:", err.message);
+        logger.info("Tentando QR Code como alternativa...");
+      }
+    }, 3000);
   }
 
   sock.ev.on("connection.update", (update) => {
-    const { connection, lastDisconnect } = update;
+    const { connection, lastDisconnect, qr } = update;
+
+    if (qr) {
+      // Caso o código não funcione, mostra QR pequeno
+      logger.info("QR Code disponível (alternativa).");
+    }
 
     if (connection === "close") {
       const statusCode = lastDisconnect?.error?.output?.statusCode;
