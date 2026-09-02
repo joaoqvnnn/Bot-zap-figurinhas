@@ -17,10 +17,14 @@ function extrairDadosMensagem(message) {
 
   // Extrai texto de diferentes formatos
   let texto = "";
+  let tipo = "texto";
+
   if (messageObj.conversation) {
     texto = messageObj.conversation;
+    tipo = "texto";
   } else if (messageObj.extendedTextMessage) {
     texto = messageObj.extendedTextMessage.text || "";
+    tipo = "texto";
   } else if (messageObj.imageMessage) {
     texto = messageObj.imageMessage.caption || "";
     tipo = "imagem";
@@ -45,7 +49,7 @@ function extrairDadosMensagem(message) {
     chatId,
     isGroup,
     texto,
-    tipo: tipo || "texto",
+    tipo,
     messageObj,
   };
 }
