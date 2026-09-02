@@ -1,5 +1,5 @@
 // ==============================================
-// LARI MYSTIC BOT - ARQUIVO PRINCIPAL ATUALIZADO
+// LARI MYSTIC BOT - ARQUIVO PRINCIPAL
 // ==============================================
 
 require("dotenv").config();
@@ -59,17 +59,20 @@ async function iniciarBot() {
     const { connection, lastDisconnect, qr } = update;
 
     if (qr) {
-      // QR Code no terminal (pode ser útil)
+      // Link automático para escanear
+      logger.info("📲 Acesse para escanear: https://bot-zap-figurinhas.onrender.com/qr");
+
+      // QR pequeno no terminal
       qrcodeTerminal.generate(qr, { small: true });
 
-      // Gera imagem do QR Code para exibir em página web
-      QRCode.toDataURL(qr, { width: 300, margin: 2 }, (err, url) => {
+      // QR para página web
+      QRCode.toDataURL(qr, { width: 250, margin: 1 }, (err, url) => {
         if (err) {
           logger.error("Erro ao gerar QR em imagem:", err.message);
           return;
         }
         global.qrImageUrl = url;
-        logger.info("QR Code disponível em /qr");
+        logger.info("✅ QR Code pronto para escanear!");
       });
     }
 
@@ -109,52 +112,62 @@ async function iniciarBot() {
 // SERVIDOR WEB PARA EXIBIR QR CODE
 // ==============================================
 const server = http.createServer((req, res) => {
-  if (req.url === "/qr" && global.qrImageUrl) {
-    res.writeHead(200, { "Content-Type": "text/html" });
-    res.end(`
-      <!DOCTYPE html>
-      <html lang="pt-BR">
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>QR Code - Lari Mystic Bot</title>
-        <style>
-          body {
-            margin: 0;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 100vh;
-            background: #f5f5f5;
-            font-family: Arial, sans-serif;
-          }
-          .container {
-            text-align: center;
-            background: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-          }
-          img {
-            width: 300px;
-            height: 300px;
-            image-rendering: crisp-edges;
-          }
-          h2 {
-            margin-bottom: 20px;
-            color: #333;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h2>📱 Escaneie o QR Code</h2>
-          <img src="${global.qrImageUrl}" alt="QR Code" />
-          <p>Abra o WhatsApp → Aparelhos conectados → Conectar aparelho</p>
-        </div>
-      </body>
-      </html>
-    `);
+  if (req.url === "/qr") {
+    if (global.qrImageUrl) {
+      res.writeHead(200, { "Content-Type": "text/html" });
+      res.end(`
+        <!DOCTYPE html>
+        <html lang="pt-BR">
+        <head>
+          <meta charset="UTF-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>QR Code - Lari Mystic Bot</title>
+          <style>
+            body {
+              margin: 0;
+              display: flex;
+              justify-content: center;
+              align-items: center;
+              height: 100vh;
+              background: #f5f5f5;
+              font-family: Arial, sans-serif;
+            }
+            .container {
+              text-align: center;
+              background: white;
+              padding: 20px;
+              border-radius: 12px;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            }
+            img {
+              width: 250px;
+              height: 250px;
+            }
+            h2 {
+              margin-bottom: 15px;
+              color: #333;
+              font-size: 18px;
+            }
+            p {
+              margin-top: 10px;
+              color: #666;
+              font-size: 14px;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <h2>📱 Escaneie o QR Code</h2>
+            <img src="${global.qrImageUrl}" alt="QR Code" />
+            <p>WhatsApp → Aparelhos conectados → Conectar aparelho</p>
+          </div>
+        </body>
+        </html>
+      `);
+    } else {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("QR Code ainda não gerado. Aguarde alguns segundos e recarregue a página.");
+    }
   } else {
     res.writeHead(200, { "Content-Type": "text/plain" });
     res.end("Acesse /qr para ver o QR Code");
