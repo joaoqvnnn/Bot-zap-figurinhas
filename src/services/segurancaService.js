@@ -6,13 +6,11 @@ const config = require("../config");
 const logger = require("../utils/logger");
 const { limparNumero } = require("../utils/helpers");
 
-// Estrutura de dados em memória (será migrada para MongoDB)
 const listaNegraGlobal = new Set();
 const protecoesAtivas = new Map();
 const tentativasToken = new Map();
 const registroAcoes = [];
 
-// Funções básicas de segurança
 async function isBlocked(remetente) {
   const numero = limparNumero(remetente.split("@")[0]);
   return listaNegraGlobal.has(numero);
@@ -92,8 +90,6 @@ async function registrarAcao(acao, detalhes = {}) {
     acao,
     detalhes,
   });
-  logger.debug(`Ação registrada: ${acao}`);
-  // Limita a 500 registros em memória
   if (registroAcoes.length > 500) {
     registroAcoes.shift();
   }
