@@ -1,16 +1,12 @@
 // ==============================================
-// LARI MYSTIC BOT - SERVIÇO DE GESTÃO DE MEMBROS
+// LARI MYSTIC BOT - SERVIÇO DE MEMBROS
 // ==============================================
 
 const logger = require("../utils/logger");
 const { limparNumero } = require("../utils/helpers");
 
-// Armazena moderadores e permissões customizadas em memória
-const moderadores = new Map(); // chatId -> Map(numero -> permissões)
+const moderadores = new Map();
 
-/**
- * Adiciona moderador a um grupo.
- */
 function adicionarModerador(chatId, numero) {
   const num = limparNumero(numero);
   if (!moderadores.has(chatId)) {
@@ -25,9 +21,6 @@ function adicionarModerador(chatId, numero) {
   return false;
 }
 
-/**
- * Remove moderador de um grupo.
- */
 function removerModerador(chatId, numero) {
   const num = limparNumero(numero);
   if (moderadores.has(chatId)) {
@@ -40,9 +33,6 @@ function removerModerador(chatId, numero) {
   return false;
 }
 
-/**
- * Concede permissão de comando a um moderador.
- */
 function concederPermissao(chatId, numero, comando) {
   const num = limparNumero(numero);
   if (!moderadores.has(chatId) || !moderadores.get(chatId).has(num)) return false;
@@ -50,18 +40,12 @@ function concederPermissao(chatId, numero, comando) {
   return true;
 }
 
-/**
- * Revoga permissão de comando de um moderador.
- */
 function revogarPermissao(chatId, numero, comando) {
   const num = limparNumero(numero);
   if (!moderadores.has(chatId) || !moderadores.get(chatId).has(num)) return false;
   return moderadores.get(chatId).get(num).delete(comando.toLowerCase());
 }
 
-/**
- * Verifica se um moderador pode executar um comando.
- */
 function temPermissao(chatId, numero, comando) {
   const num = limparNumero(numero);
   if (!moderadores.has(chatId)) return false;
@@ -70,17 +54,11 @@ function temPermissao(chatId, numero, comando) {
   return grupo.get(num).has(comando.toLowerCase());
 }
 
-/**
- * Lista moderadores de um grupo.
- */
 function listarModeradores(chatId) {
   if (!moderadores.has(chatId)) return [];
   return Array.from(moderadores.get(chatId).keys());
 }
 
-/**
- * Lista permissões de um moderador.
- */
 function listarPermissoes(chatId, numero) {
   const num = limparNumero(numero);
   if (!moderadores.has(chatId) || !moderadores.get(chatId).has(num)) return [];
