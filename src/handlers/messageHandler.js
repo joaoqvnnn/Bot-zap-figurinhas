@@ -1,10 +1,9 @@
 // ==============================================
-// LARI MYSTIC BOT - HANDLER PRINCIPAL DE MENSAGENS
+// LARI MYSTIC BOT - HANDLER PRINCIPAL
 // ==============================================
 
 const logger = require("../utils/logger");
 const { extrairDadosMensagem, normalizarTexto } = require("../utils/helpers");
-const { processarCarta } = require("../menus/cartaMisteriosa");
 const { verificarPermissao } = require("../menus/permissoes");
 const { isBlocked } = require("../services/segurancaService");
 
@@ -16,6 +15,9 @@ const { handleAdmin } = require("./admin");
 const { handleResenhas } = require("./resenhas");
 const { handleGroupManagement } = require("./groupManagement");
 const { handleStickers } = require("./stickers");
+const { handleGestaoMembros } = require("./gestaoMembros");
+const { handleDono } = require("./dono");
+const { handleProtecoes } = require("./protecoes");
 
 async function handleMessage(sock, message) {
   const dados = extrairDadosMensagem(message);
@@ -28,6 +30,7 @@ async function handleMessage(sock, message) {
     return;
   }
 
+  // Tenta iniciar o menu/carta primeiro
   const iniciouCarta = await handleStart(sock, message);
   if (iniciouCarta) return;
 
@@ -40,6 +43,7 @@ async function handleMessage(sock, message) {
       return;
     }
 
+    // Encaminha para os handlers específicos
     await handleDiversao(sock, message);
     await handleModeracao(sock, message);
     await handleRPG(sock, message);
@@ -47,6 +51,9 @@ async function handleMessage(sock, message) {
     await handleResenhas(sock, message);
     await handleGroupManagement(sock, message);
     await handleStickers(sock, message);
+    await handleGestaoMembros(sock, message);
+    await handleDono(sock, message);
+    await handleProtecoes(sock, message);
   }
 }
 
