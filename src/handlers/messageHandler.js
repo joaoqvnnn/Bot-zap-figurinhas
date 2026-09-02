@@ -6,8 +6,8 @@ const logger = require("../utils/logger");
 const { extrairDadosMensagem, normalizarTexto } = require("../utils/helpers");
 const { verificarPermissao } = require("../menus/permissoes");
 const { isBlocked } = require("../services/segurancaService");
+const { processarCarta } = require("../menus/cartaMisteriosa");
 
-const { handleStart } = require("./start");
 const { handleDiversao } = require("./diversao");
 const { handleModeracao } = require("./moderacao");
 const { handleRPG } = require("./rpg");
@@ -30,9 +30,11 @@ async function handleMessage(sock, message) {
     return;
   }
 
-  // Tenta iniciar o menu/carta primeiro
-  const iniciouCarta = await handleStart(sock, message);
-  if (iniciouCarta) return;
+  // Se for "menu" ou "carta", abre o menu novo (enquete)
+  if (texto && (texto.toLowerCase() === "menu" || texto.toLowerCase() === "carta")) {
+    await processarCarta(sock, chatId, remetente, isGroup);
+    return;
+  }
 
   if (texto && (texto.startsWith("/") || texto.startsWith("!"))) {
     const comando = normalizarTexto(texto.slice(1).split(" ")[0]);
@@ -43,7 +45,6 @@ async function handleMessage(sock, message) {
       return;
     }
 
-    // Encaminha para os handlers específicos
     await handleDiversao(sock, message);
     await handleModeracao(sock, message);
     await handleRPG(sock, message);
